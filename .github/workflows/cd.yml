@@ -1,0 +1,112 @@
+name: CampusOps CD Deploy Pipeline
+
+on:
+  # 1. Manual trigger from GitHub Actions tab
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: "Target Environment to Deploy"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - prod
+
+  # 2. Automated trigger on merge to main, gated by GitHub Environment manual approval
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  # ============================================================================
+  # Production Deployment Pipeline with Required Approval Gate
+  # ============================================================================
+  deploy:
+    name: Deploy Infrastructure & Frontend to AWS
+    runs-on: ubuntu-latest
+    # Requires manual approval configured in GitHub: Repo Settings -> Environments -> production
+    environment: production
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------------
+      # AWS Authentication via GitHub Secrets
+      # ------------------------------------------------------------------------
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      # ------------------------------------------------------------------------
+      # Infrastructure Deployment (Terraform)
+      # ------------------------------------------------------------------------
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.5"
+
+      - name: Terraform Init
+        working-directory: infra/terraform
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: infra/terraform
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        working-directory: infra/terraform
+        run: terraform apply -auto-approve tfplan
+
+      - name: Capture Terraform Outputs
+        id: tf_outputs
+        working-directory: infra/terraform
+        run: |
+          echo "api_url=$(terraform output -raw api_endpoint_url)" >> $GITHUB_OUTPUT
+          echo "s3_bucket=$(terraform output -raw s3_frontend_bucket_name)" >> $GITHUB_OUTPUT
+          echo "cognito_pool_id=$(terraform output -raw cognito_user_pool_id)" >> $GITHUB_OUTPUT
+          echo "cognito_client_id=$(terraform output -raw cognito_app_client_id)" >> $GITHUB_OUTPUT
+
+      # ------------------------------------------------------------------------
+      # Frontend Build & S3 Static Website Deployment
+      # ------------------------------------------------------------------------
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: frontend/package.json
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build React Production Bundle
+        working-directory: frontend
+        env:
+          VITE_API_ENDPOINT: ${{ steps.tf_outputs.outputs.api_url }}
+          VITE_COGNITO_USER_POOL_ID: ${{ steps.tf_outputs.outputs.cognito_pool_id }}
+          VITE_COGNITO_CLIENT_ID: ${{ steps.tf_outputs.outputs.cognito_client_id }}
+        run: npm run build
+
+      - name: Deploy Frontend to S3 Static Website Bucket
+        run: |
+          aws s3 sync frontend/dist/ s3://${{ steps.tf_outputs.outputs.s3_bucket }}/ --delete
+
+      - name: Output Deployment Summary
+        run: |
+          echo "=========================================================="
+          echo "🚀 CampusOps Deployment Completed Successfully!"
+          echo "API Gateway URL : ${{ steps.tf_outputs.outputs.api_url }}"
+          echo "S3 Bucket Name  : ${{ steps.tf_outputs.outputs.s3_bucket }}"
+          echo "Cognito Pool ID : ${{ steps.tf_outputs.outputs.cognito_pool_id }}"
+          echo "=========================================================="
+

@@ -1,0 +1,17 @@
+.env
+.env.*
+*.tfstate
+*.tfstate.*
+tfplan
+tfplan.*
+.terraform/
+.terraform.lock.hcl
+node_modules/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+.venv/
+dist/
+*.zip
+.aws/

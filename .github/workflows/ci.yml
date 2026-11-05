@@ -1,0 +1,133 @@
+name: CampusOps CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  # ============================================================================
+  # 1. Backend CI: Test & Lint Python 3.12 Lambdas
+  # ============================================================================
+  backend-test:
+    name: Backend Tests & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install flake8 pytest-cov
+
+      - name: Lint Python Code with Flake8
+        run: |
+          # Stop build if syntax errors or undefined names exist
+          flake8 backend/src --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Warning check for complexity and line length (max 120)
+          flake8 backend/src --count --max-complexity=10 --max-line-length=120 --statistics
+
+      - name: Run Backend Tests with Pytest & Moto
+        env:
+          AWS_DEFAULT_REGION: ap-south-1
+          AWS_REGION: ap-south-1
+          INCIDENTS_TABLE_NAME: campusops-incidents
+        run: |
+          python -m pytest backend/tests -v --cov=backend/src --cov-report=xml
+
+  # ============================================================================
+  # 2. Frontend CI: Test & Build React + Vite SPA
+  # ============================================================================
+  frontend-test:
+    name: Frontend Tests & Build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: frontend/package.json
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      - name: Run Vitest Suite
+        run: npm test
+
+      - name: Run Production Vite Build
+        run: npm run build
+
+  # ============================================================================
+  # 3. SonarCloud Code Quality Analysis
+  # ============================================================================
+  sonarcloud-scan:
+    name: SonarCloud Code Quality Scan
+    runs-on: ubuntu-latest
+    needs: [ backend-test, frontend-test ]
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout Full History for Analysis
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history required for SonarCloud blame/analysis
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        continue-on-error: true # Prevents CI blocking if SonarCloud token is not yet configured by student
+
+  # ============================================================================
+  # 4. Terraform Format & Validation (Offline, No AWS Credentials)
+  # ============================================================================
+  terraform-validate:
+    name: Terraform Format & Validate
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: infra/terraform
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.5"
+
+      - name: Terraform Format Check
+        run: terraform fmt -check
+
+      - name: Terraform Init (No Backend)
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        run: terraform validate
+
