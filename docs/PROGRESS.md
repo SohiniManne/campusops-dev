@@ -133,6 +133,11 @@
 - Updated Terraform infrastructure:
   - Re-pointed SNS SLA escalation alert topic subscription to `umeshreddy3005@gmail.com`.
   - Re-pointed AWS Budgets 80% & 100% cost threshold alerts to `umeshreddy3005@gmail.com`.
+  - Confirmed active Amazon SNS subscription for SLA breach escalation alerts:
+    - ARN: `arn:aws:sns:ap-south-1:418059030221:campusops-sla-alerts-dev:e4df52d9-dcc3-4832-a124-d27c3e16c5be` ✅
+- Pruned dead CloudFront resources (`aws_cloudfront_origin_access_control.frontend`) from state and codebase.
+- Remote S3 Terraform state with native S3 locking verified with 0 drift.
+- Synchronized repository to GitHub: `https://github.com/SohiniManne/campusops-dev`.
 
 
 
