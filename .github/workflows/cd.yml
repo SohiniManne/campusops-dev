@@ -39,7 +39,18 @@ jobs:
       # ------------------------------------------------------------------------
       # AWS Authentication via GitHub Secrets
       # ------------------------------------------------------------------------
+      - name: Verify AWS Secrets Configured
+        id: check_creds
+        run: |
+          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ] || [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
+            echo "has_creds=false" >> $GITHUB_OUTPUT
+            echo "::notice title=Deployment Pending Secrets::AWS deployment skipped because AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY are not configured yet in GitHub Secrets."
+          else
+            echo "has_creds=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Configure AWS Credentials
+        if: steps.check_creds.outputs.has_creds == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -50,23 +61,28 @@ jobs:
       # Infrastructure Deployment (Terraform)
       # ------------------------------------------------------------------------
       - name: Set up Terraform
+        if: steps.check_creds.outputs.has_creds == 'true'
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.10.5"
 
       - name: Terraform Init
+        if: steps.check_creds.outputs.has_creds == 'true'
         working-directory: infra/terraform
         run: terraform init
 
       - name: Terraform Plan
+        if: steps.check_creds.outputs.has_creds == 'true'
         working-directory: infra/terraform
         run: terraform plan -out=tfplan
 
       - name: Terraform Apply
+        if: steps.check_creds.outputs.has_creds == 'true'
         working-directory: infra/terraform
         run: terraform apply -auto-approve tfplan
 
       - name: Capture Terraform Outputs
+        if: steps.check_creds.outputs.has_creds == 'true'
         id: tf_outputs
         working-directory: infra/terraform
         run: |
@@ -79,6 +95,7 @@ jobs:
       # Frontend Build & S3 Static Website Deployment
       # ------------------------------------------------------------------------
       - name: Set up Node.js 20
+        if: steps.check_creds.outputs.has_creds == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -86,10 +103,12 @@ jobs:
           cache-dependency-path: frontend/package.json
 
       - name: Install Frontend Dependencies
+        if: steps.check_creds.outputs.has_creds == 'true'
         working-directory: frontend
         run: npm ci
 
       - name: Build React Production Bundle
+        if: steps.check_creds.outputs.has_creds == 'true'
         working-directory: frontend
         env:
           VITE_API_ENDPOINT: ${{ steps.tf_outputs.outputs.api_url }}
@@ -98,10 +117,12 @@ jobs:
         run: npm run build
 
       - name: Deploy Frontend to S3 Static Website Bucket
+        if: steps.check_creds.outputs.has_creds == 'true'
         run: |
           aws s3 sync frontend/dist/ s3://${{ steps.tf_outputs.outputs.s3_bucket }}/ --delete
 
       - name: Output Deployment Summary
+        if: steps.check_creds.outputs.has_creds == 'true'
         run: |
           echo "=========================================================="
           echo "🚀 CampusOps Deployment Completed Successfully!"

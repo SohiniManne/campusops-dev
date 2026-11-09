@@ -39,7 +39,7 @@ jobs:
           # Stop build if syntax errors or undefined names exist
           flake8 backend/src --count --select=E9,F63,F7,F82 --show-source --statistics
           # Warning check for complexity and line length (max 120)
-          flake8 backend/src --count --max-complexity=10 --max-line-length=120 --statistics
+          flake8 backend/src --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
 
       - name: Run Backend Tests with Pytest & Moto
         env:

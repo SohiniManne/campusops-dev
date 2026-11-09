@@ -82,7 +82,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     try:
         update_res = table.update_item(
             Key={"incident_id": incident_id},
-            UpdateExpression="SET #assigned_to = :at, #assigned_to_name = :atn, #assigned_at = :aa, #status = :s, #updated_at = :ua",
+            UpdateExpression=(
+                "SET #assigned_to = :at, #assigned_to_name = :atn, "
+                "#assigned_at = :aa, #status = :s, #updated_at = :ua"
+            ),
             ExpressionAttributeNames={
                 "#assigned_to": "assigned_to",
                 "#assigned_to_name": "assigned_to_name",

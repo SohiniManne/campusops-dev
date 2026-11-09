@@ -1,7 +1,8 @@
 """
 Check SLA Lambda Handler.
 AWS Resource: AWS Lambda Function (check_sla).
-Purpose: Periodically scans active incidents past their SLA resolution deadline, marks them as BREACHED in DynamoDB, and dispatches automated SNS email alerts to administrators.
+Purpose: Periodically scans active incidents past their SLA resolution deadline,
+marks them as BREACHED in DynamoDB, and dispatches automated SNS email alerts to administrators.
 """
 
 import os

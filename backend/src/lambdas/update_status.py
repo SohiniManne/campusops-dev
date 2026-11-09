@@ -59,7 +59,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     new_status = new_status.upper().strip()
     if new_status not in ALLOWED_PROGRESS_STATUSES:
         return build_response(400, {
-            "error": f"Invalid status transition. Allowed values: {', '.join(ALLOWED_PROGRESS_STATUSES)}. Use the resolve endpoint to close tickets."
+            "error": (
+                f"Invalid status transition. Allowed values: {', '.join(ALLOWED_PROGRESS_STATUSES)}. "
+                "Use the resolve endpoint to close tickets."
+            )
         })
 
     # 4. Fetch current incident record

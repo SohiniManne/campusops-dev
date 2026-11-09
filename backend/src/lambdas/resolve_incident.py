@@ -1,7 +1,8 @@
 """
 Resolve Incident Lambda Handler.
 AWS Resource: AWS Lambda Function (resolve_incident).
-Purpose: Allows assigned Maintenance Staff or Administrators to mark a ticket as RESOLVED with mandatory resolution notes.
+Purpose: Allows assigned Maintenance Staff or Administrators to mark a ticket
+as RESOLVED with mandatory resolution notes.
 """
 
 import json
